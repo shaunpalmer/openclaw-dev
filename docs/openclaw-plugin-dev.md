@@ -6,10 +6,12 @@ We hit multiple non-obvious pitfalls while building a local OpenClaw plugin (`ch
 
 ### Current status (working baseline)
 
-* Plugin is installed, discovered, and **loaded**: `Channel Manager | channel-manager | loaded | ~/.openclaw/extensions/channel-manager/index.ts | 0.1.0`
-* Gateway is running; **SQLite DB active**; **6 tools registered**
+* Plugin installed, discovered, and **loaded**: `Channel Manager | channel-manager | loaded | ~/.openclaw/extensions/channel-manager/index.ts | 0.1.0`
+* Gateway running; **SQLite DB active**; **6 tools registered**
+* **14 native channels** registered via `api.registerChannel()` — appear in Control UI Channels page alongside WhatsApp/Telegram/Discord
 * CLI works (e.g. `npx openclaw channel-manager status` shows channels)
-* HTTP API routes are live
+* HTTP API routes live: `/api/channels`, `/api/leads`, `/api/browser-login`, `/api/confirm`, `/console`
+* Browser-login endpoint spawns `openclaw browser open` with portable path resolution
 * Channel statuses show `unknown` until session-tier sites are connected (manual login + confirm)
 
 ---
@@ -121,6 +123,179 @@ OpenClaw's `deriveIdHint()` reads `package.json` name to cross-check against the
 > plugin id mismatch (manifest uses "X", entry hints "Y")
 
 **Rule:** keep `package.json` name identical to `openclaw.plugin.json` id, or at minimum use `@scope/<id>` format (like built-in plugins use `@openclaw/<id>`).
+
+---
+
+### 9) `api.registerChannel()` requires `capabilities: {}`
+
+When you register a native channel via `api.registerChannel({ plugin })`, the plugin object **must** include `capabilities: {}` (even if empty).
+
+Without it, the dock system calls `buildDockFromPlugin()` which copies `plugin.capabilities` as `undefined`. On the next heartbeat, `dock.capabilities.nativeCommands` throws a TypeError and **crashes the gateway**.
+
+```typescript
+// ✅ Correct — heartbeat stays healthy
+{
+  id: "my-channel",
+  meta: { id: "my-channel", label: "My Channel", ... },
+  capabilities: {},   // ← REQUIRED even if empty
+  config: { ... },
+  status: { ... },
+}
+
+// ❌ Crashes — nativeCommands read on undefined
+{
+  id: "my-channel",
+  meta: { ... },
+  // missing capabilities → TypeError on heartbeat
+}
+```
+
+---
+
+### 10) HTTP routes: GET only, no path params
+
+Plugin HTTP routes registered via `api.registerHttpRoute()` have restrictions:
+
+* **Only GET is supported.** POST/PUT/DELETE requests won't reach the handler. If you need to accept data, use query params.
+* **No `:param` path segments.** The route path must be an exact-match string — OpenClaw doesn't parse Express-style params.
+
+```typescript
+// ✅ Works — query params
+api.registerHttpRoute({
+  path: "/__openclaw__/my-plugin/api/action",
+  handler: (req, res) => {
+    const url = new URL(req.url || "", "http://localhost");
+    const id = url.searchParams.get("id") || "";
+    // ...
+  },
+});
+
+// ❌ Doesn't work — path params
+api.registerHttpRoute({
+  path: "/__openclaw__/my-plugin/api/action/:id",  // never matches
+  handler: (req, res) => { /* never reached */ },
+});
+```
+
+**Convention:** prefix all paths with `/__openclaw__/<pluginId>/` to avoid collisions.
+
+---
+
+### 11) Gateway command is `openclaw gateway`, not `openclaw start`
+
+The CLI command to start the gateway is:
+
+```bash
+npx openclaw gateway --port 18789       # specific port
+npx openclaw gateway --force            # kill existing + start
+npx openclaw gateway                    # default port from config
+```
+
+**`openclaw start` does not exist.** If you try it, you get `unknown command 'start'`. Other useful commands:
+
+```bash
+npx openclaw health                     # check if gateway is up
+npx openclaw plugins list               # see loaded plugins
+npx openclaw doctor                     # health checks + quick fixes
+npx openclaw dashboard                  # open Control UI
+```
+
+---
+
+### 12) Browser integration: Chrome extension relay
+
+OpenClaw controls a browser via a Chrome extension ("OpenClaw Browser Relay") that ships at:
+
+```
+<openclaw-install>/assets/chrome-extension/
+```
+
+**How it works:**
+
+1. The gateway runs a browser control service on port `gateway+2` (e.g. 18791)
+2. The Chrome extension connects to that service via WebSocket
+3. `openclaw browser open <url> --profile chrome` tells the relay to navigate a tab
+4. The human logs in → cookies persist in that Chrome profile → Scout reuses them
+
+**Setup steps:**
+
+1. Run: `npx openclaw browser extension install` (copies extension to a stable path)
+2. Open Chrome → `chrome://extensions` → Enable Developer Mode → "Load unpacked" → select the extension folder
+3. Click the extension icon on any tab to attach it to the gateway
+4. Verify: `npx openclaw browser status` should show "connected"
+
+**Without the extension:** all `browser open` commands will fail with:
+
+> Chrome extension relay is running, but no tab is connected. Click the OpenClaw Chrome extension icon on a tab to attach it (profile "chrome").
+
+---
+
+### 13) Portable path resolution for `exec` calls
+
+If your plugin spawns `npx openclaw ...` via `child_process.exec()`, **never hardcode** the install path. Use `process.execPath` to derive the node binary location, then resolve `npx` from the same directory:
+
+```typescript
+import { exec } from "node:child_process";
+import path from "node:path";
+
+// ✅ Portable — works on any machine
+const npxBin = path.join(path.dirname(process.execPath), "npx");
+const cmd = `"${npxBin}" openclaw browser open "${url}" --profile chrome`;
+exec(cmd, (err) => {
+  if (err) api.logger.error(`Browser launch failed: ${err.message}`);
+});
+
+// ❌ Breaks on other machines
+const cmd = `npx openclaw browser open "${url}"`;
+exec(cmd, { env: { ...process.env, PATH: process.env.PATH + ";F:\\openclaw\\npm-global" } }, ...);
+```
+
+**Why:** `process.execPath` always points to the Node binary that's running the gateway. On the same machine, `npx` lives alongside it. This works across Windows/macOS/Linux without hardcoded paths.
+
+---
+
+### 14) Native channel registration — the full recipe
+
+To make plugin channels appear in the Control UI Channels page (alongside WhatsApp/Telegram/Discord):
+
+```typescript
+function buildChannelPlugin(channel, db) {
+  return {
+    id: channel.id,
+    meta: {
+      id: channel.id,
+      label: channel.name,
+      detailLabel: `${channel.name} — Session-Based`,
+      blurb: `Description text.`,
+      order: 100,  // after built-in channels (0–7)
+    },
+    capabilities: {},  // REQUIRED — see gotcha #9
+    config: {
+      listAccountIds: () => ["default"],
+      resolveAccount: (_, accountId) => ({ accountId, enabled: true }),
+      defaultAccountId: () => "default",
+      isConfigured: () => true,
+    },
+    status: {
+      buildChannelSummary: async () => {
+        // Return status for the UI card
+        return { configured: true, running: false, connected: true };
+      },
+    },
+  };
+}
+
+// Register in your plugin's register() function:
+for (const ch of channels) {
+  api.registerChannel({ plugin: buildChannelPlugin(ch, db) });
+}
+```
+
+The Control UI has a **generic card renderer** (`Yp()`) that handles any channel type not in the hardcoded 8. Your channels will show status cards with Configured/Running/Connected indicators and error callouts — no custom UI needed.
+
+**Ordering:** built-in channels use `order` 0–7. Set your channels to 100+ to sort after them. Group by tier (e.g. session=100, public=110).
+
+See [native-channel-integration.md](native-channel-integration.md) for the full server→client data pipeline.
 
 ---
 
@@ -582,4 +757,4 @@ Because OpenClaw plugins can execute code:
 
 ---
 
-*Written 12 Feb 2026 — based on real build experience with channel-manager plugin on OpenClaw v2026.2.9 (33c75cb), Windows 10, Node.js 22.16.0.*
+*Written 12 Feb 2026 — updated with native channel registration, browser integration, and HTTP route learnings. Based on real build experience with channel-manager plugin on OpenClaw v2026.2.9 (33c75cb), Windows 10, Node.js 22.16.0.*

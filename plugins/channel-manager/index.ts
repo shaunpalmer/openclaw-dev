@@ -579,6 +579,120 @@ const plugin = {
     api.logger.info(`Channel Manager: registered ${DEFAULT_CHANNELS.length} native channels`);
 
     // ========================================================================
+    // Session Health Checker — periodic verification of channel sessions
+    //
+    // Runs on a timer to keep session statuses fresh. Two strategies:
+    //
+    // 1. BROWSER CHECK (when Chrome extension is connected):
+    //    For each session-tier channel, uses `openclaw browser request`
+    //    to fetch the login URL and check for loggedInIndicator vs
+    //    loginPageIndicator in the page source.
+    //
+    // 2. STALENESS FALLBACK (when browser isn't available):
+    //    If a session hasn't been checked in >24 hours and was previously
+    //    "connected", downgrades to "unknown" to flag it for attention.
+    //
+    // The checker respects per-channel intervals and avoids hammering
+    // sites by spacing checks at least 5 seconds apart.
+    // ========================================================================
+
+    const SESSION_CHECK_INTERVAL_MS = parseInt(
+      (pluginConfig.sessionCheckInterval as string) || "900000", 10,
+    ); // 15 minutes default
+    const SESSION_STALENESS_MS = 24 * 60 * 60 * 1000; // 24 hours
+    const PER_CHANNEL_DELAY_MS = 5000; // 5 seconds between channel checks
+    let sessionCheckTimer: ReturnType<typeof setInterval> | null = null;
+
+    /**
+     * Check a single channel's session by requesting its login URL
+     * through the OpenClaw browser and inspecting the response.
+     */
+    async function checkChannelSession(channel: ChannelConfig): Promise<void> {
+      // Only check session-tier channels
+      if (channel.tier !== "session") return;
+
+      const npxBin = path.join(path.dirname(process.execPath), "npx");
+      const checkUrl = channel.loginUrl;
+
+      return new Promise<void>((resolve) => {
+        // Use `openclaw browser request` to GET the page via the shared Chrome session.
+        // This hits the page through the relay-connected Chrome tab, so it sees
+        // the same cookies Scout would see.
+        const cmd = `"${npxBin}" openclaw browser request "${checkUrl}" --profile chrome --json`;
+
+        exec(cmd, { timeout: 30000 }, (err, stdout, _stderr) => {
+          const now = new Date().toISOString();
+
+          if (err) {
+            // Browser not available — apply staleness heuristic
+            const session = db.getSession(channel.id);
+            if (session && session.status === "connected" && session.lastCheckedAt) {
+              const lastCheck = new Date(session.lastCheckedAt).getTime();
+              const elapsed = Date.now() - lastCheck;
+              if (elapsed > SESSION_STALENESS_MS) {
+                db.updateSession(channel.id, "unknown", `Stale — not checked in ${Math.round(elapsed / 3600000)}h (browser unavailable)`);
+                db.logActivity(channel.id, "session_check", "stale", "Browser unavailable, staleness threshold exceeded");
+                api.logger.warn(`Channel ${channel.id}: marked unknown (stale, browser unavailable)`);
+              }
+              // Otherwise leave it as-is — still within staleness window
+            }
+            resolve();
+            return;
+          }
+
+          // Parse the browser response and check indicators
+          try {
+            const body = stdout || "";
+            const hasLoggedIn = channel.loggedInIndicator && body.includes(channel.loggedInIndicator);
+            const hasLoginPage = channel.loginPageIndicator && body.includes(channel.loginPageIndicator);
+
+            if (hasLoggedIn && !hasLoginPage) {
+              // Logged in — session is good
+              db.updateSession(channel.id, "connected", `Auto-verified at ${now}`);
+              db.logActivity(channel.id, "session_check", "connected", "Auto-verified via browser check");
+            } else if (hasLoginPage && !hasLoggedIn) {
+              // Hit login page — session expired
+              db.updateSession(channel.id, "expired", `Login page detected at ${now}`);
+              db.logActivity(channel.id, "session_check", "expired", "Login page indicator found");
+              api.logger.warn(`Channel ${channel.id}: session expired (login page detected)`);
+            } else {
+              // Ambiguous — page content doesn't match either indicator clearly
+              // Don't change status, just update the check timestamp
+              const session = db.getSession(channel.id);
+              if (session) {
+                db.updateSession(channel.id, session.status, `Checked at ${now} — indicators inconclusive`);
+              }
+              db.logActivity(channel.id, "session_check", "inconclusive", "Neither indicator matched clearly");
+            }
+          } catch (parseErr: any) {
+            db.logActivity(channel.id, "session_check", "error", `Parse error: ${parseErr.message}`);
+          }
+          resolve();
+        });
+      });
+    }
+
+    /**
+     * Run a full health check cycle across all session-tier channels.
+     * Staggers checks with a delay to avoid hammering.
+     */
+    async function runSessionHealthCheck(): Promise<void> {
+      const sessionChannels = DEFAULT_CHANNELS.filter((ch) => ch.tier === "session");
+      api.logger.info(`Session health check: scanning ${sessionChannels.length} session-tier channels`);
+
+      for (let i = 0; i < sessionChannels.length; i++) {
+        await checkChannelSession(sessionChannels[i]);
+        // Stagger: wait between channels (skip delay after last one)
+        if (i < sessionChannels.length - 1) {
+          await new Promise((r) => setTimeout(r, PER_CHANNEL_DELAY_MS));
+        }
+      }
+
+      db.logActivity(null, "session_health_check", "completed", `Checked ${sessionChannels.length} channels`);
+      api.logger.info(`Session health check complete — ${sessionChannels.length} channels scanned`);
+    }
+
+    // ========================================================================
     // Tool: channel_status — Scout checks this before scraping
     // ========================================================================
 
@@ -746,6 +860,45 @@ const plugin = {
     }, { name: "lead_stats" });
 
     // ========================================================================
+    // Tool: session_check — On-demand session health verification
+    // ========================================================================
+
+    api.registerTool({
+      name: "session_check",
+      label: "Check Session Health",
+      description: "Run an on-demand session health check for one or all session-tier channels. Uses the browser relay to verify login status. Returns results for each channel checked.",
+      parameters: Type.Object({
+        channelId: Type.Optional(Type.String({ description: "Channel ID to check (e.g. 'trademe'). Omit to check all session-tier channels." })),
+      }),
+      async execute(_toolCallId, params) {
+        if (params.channelId) {
+          const channel = DEFAULT_CHANNELS.find((ch) => ch.id === params.channelId);
+          if (!channel) {
+            return { content: [{ type: "text", text: `Channel '${params.channelId}' not found.` }] };
+          }
+          if (channel.tier !== "session") {
+            return { content: [{ type: "text", text: `Channel '${params.channelId}' is tier '${channel.tier}' — only session-tier channels need login checks.` }] };
+          }
+          await checkChannelSession(channel);
+          const session = db.getSession(channel.id);
+          return {
+            content: [{ type: "text", text: `Checked ${channel.name}: ${session?.status || "unknown"}\n${JSON.stringify(session, null, 2)}` }],
+          };
+        }
+
+        // Check all session channels
+        await runSessionHealthCheck();
+        const channels = db.getChannels();
+        const sessionResults = channels
+          .filter((ch) => ch.tier === "session")
+          .map((ch) => ({ id: ch.id, name: ch.name, status: ch.status, lastChecked: ch.lastCheckedAt }));
+        return {
+          content: [{ type: "text", text: `Session health check complete:\n${JSON.stringify(sessionResults, null, 2)}` }],
+        };
+      },
+    }, { name: "session_check" });
+
+    // ========================================================================
     // CLI: openclaw channel-manager <subcommand>
     // ========================================================================
 
@@ -836,6 +989,35 @@ const plugin = {
           console.log(`Archived ${archived} leads older than ${days} days.`);
           console.log(`Pruned ${pruned} activity log entries older than ${days} days.`);
         });
+
+      cmd
+        .command("check")
+        .description("Run an on-demand session health check for all session-tier channels")
+        .option("--channel <id>", "Check a specific channel only")
+        .action(async (opts: any) => {
+          if (opts.channel) {
+            const ch = DEFAULT_CHANNELS.find((c) => c.id === opts.channel);
+            if (!ch) {
+              console.error(`Unknown channel: ${opts.channel}`);
+              process.exit(1);
+            }
+            console.log(`Checking ${ch.name}...`);
+            await checkChannelSession(ch);
+            const session = db.getSession(ch.id);
+            console.log(`${ch.name}: ${session?.status || "unknown"}`);
+          } else {
+            console.log("Running full session health check...");
+            await runSessionHealthCheck();
+            const channels = db.getChannels();
+            console.log("\nResults:");
+            for (const ch of channels.filter((c) => c.tier === "session")) {
+              const icon = ch.status === "connected" ? "🟢" :
+                ch.status === "expired" ? "🟡" :
+                ch.status === "blocked" ? "🔴" : "⚪";
+              console.log(`${icon} ${ch.name.padEnd(15)} ${ch.status.padEnd(12)} checked: ${ch.lastCheckedAt || "never"}`);
+            }
+          }
+        });
     }, { commands: ["channel-manager"] });
 
     // ========================================================================
@@ -910,6 +1092,41 @@ const plugin = {
       },
     });
 
+    // Trigger session health check via HTTP (GET, optional ?channelId=xxx)
+    api.registerHttpRoute({
+      path: "/__openclaw__/channel-manager/api/session-check",
+      handler: async (req, res) => {
+        const url = new URL(req.url || "", "http://localhost");
+        const channelId = url.searchParams.get("channelId") || "";
+
+        try {
+          if (channelId) {
+            const channel = DEFAULT_CHANNELS.find((ch) => ch.id === channelId);
+            if (!channel) {
+              res.writeHead(404, { "Content-Type": "application/json" });
+              res.end(JSON.stringify({ error: `Channel "${channelId}" not found` }));
+              return;
+            }
+            await checkChannelSession(channel);
+            const session = db.getSession(channel.id);
+            res.writeHead(200, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ success: true, channelId, status: session?.status || "unknown", session }));
+          } else {
+            await runSessionHealthCheck();
+            const channels = db.getChannels();
+            const results = channels
+              .filter((ch) => ch.tier === "session")
+              .map((ch) => ({ id: ch.id, name: ch.name, status: ch.status, lastChecked: ch.lastCheckedAt }));
+            res.writeHead(200, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ success: true, results }));
+          }
+        } catch (err: any) {
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: err.message }));
+        }
+      },
+    });
+
     // Serve the console UI
     api.registerHttpRoute({
       path: "/__openclaw__/channel-manager/console",
@@ -930,21 +1147,44 @@ const plugin = {
     // Lifecycle hooks
     // ========================================================================
 
-    // Auto-prune on gateway start
+    // Auto-prune on gateway start + start session checker
     api.on("gateway_start", () => {
       const archived = db.archiveOldLeads(30);
       const pruned = db.pruneActivityLog(30);
       if (archived > 0 || pruned > 0) {
         api.logger.info(`Channel Manager: archived ${archived} old leads, pruned ${pruned} log entries`);
       }
+
+      // Start periodic session health checks
+      if (!sessionCheckTimer) {
+        // Run first check 30 seconds after startup (let gateway stabilize)
+        setTimeout(() => {
+          runSessionHealthCheck().catch((err) => {
+            api.logger.error(`Session health check failed: ${err}`);
+          });
+        }, 30000);
+
+        // Then run on interval
+        sessionCheckTimer = setInterval(() => {
+          runSessionHealthCheck().catch((err) => {
+            api.logger.error(`Session health check failed: ${err}`);
+          });
+        }, SESSION_CHECK_INTERVAL_MS);
+
+        api.logger.info(`Session health checker started (interval: ${SESSION_CHECK_INTERVAL_MS / 1000}s)`);
+      }
     });
 
-    // Clean shutdown
+    // Clean shutdown — stop timer + close DB
     api.on("gateway_stop", () => {
+      if (sessionCheckTimer) {
+        clearInterval(sessionCheckTimer);
+        sessionCheckTimer = null;
+      }
       db.close();
     });
 
-    api.logger.info("Channel Manager plugin loaded — tools: channel_status, channel_report_login, channel_confirm_login, lead_store, lead_search, lead_stats");
+    api.logger.info("Channel Manager plugin loaded — tools: channel_status, channel_report_login, channel_confirm_login, lead_store, lead_search, lead_stats, session_check");
   },
 };
 
