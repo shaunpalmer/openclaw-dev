@@ -23,6 +23,7 @@ import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
 import { Type } from "@sinclair/typebox";
 import fs from "node:fs";
 import path from "node:path";
+import { exec } from "node:child_process";
 
 // ============================================================================
 // Types
@@ -860,18 +861,49 @@ const plugin = {
       },
     });
 
-    // Confirm channel (POST)
+    // Confirm channel (GET with ?channelId=xxx)
     api.registerHttpRoute({
-      path: "/__openclaw__/channel-manager/api/channels/:channelId/confirm",
+      path: "/__openclaw__/channel-manager/api/confirm",
       handler: (req, res) => {
         const url = new URL(req.url || "", "http://localhost");
-        const parts = url.pathname.split("/");
-        // path: ...api/channels/<id>/confirm → id is at index -2
-        const channelId = parts[parts.length - 2];
+        const channelId = url.searchParams.get("channelId") || "";
+        if (!channelId) {
+          res.writeHead(400, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: "channelId query param required" }));
+          return;
+        }
         db.updateSession(channelId, "connected", "Confirmed via console UI");
         db.logActivity(channelId, "confirm", "connected", "Confirmed via console UI");
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ success: true, channelId, status: "connected" }));
+      },
+    });
+
+    // Launch the OpenClaw browser for a channel login (GET with ?channelId=xxx)
+    // Uses the SAME browser profile that Scout uses, so cookies are shared.
+    // Human logs in → session persists → Scout rides the cookies.
+    api.registerHttpRoute({
+      path: "/__openclaw__/channel-manager/api/browser-login",
+      handler: (req, res) => {
+        const url = new URL(req.url || "", "http://localhost");
+        const channelId = url.searchParams.get("channelId") || "";
+        const channel = DEFAULT_CHANNELS.find((ch) => ch.id === channelId);
+        if (!channel) {
+          res.writeHead(404, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: `Channel "${channelId}" not found` }));
+          return;
+        }
+        // Spawn openclaw browser open in the background — opens the login page
+        // in OpenClaw's own Chrome profile so cookies persist for Scout
+        const cmd = `npx openclaw browser open "${channel.loginUrl}" --profile chrome`;
+        exec(cmd, { env: { ...process.env, PATH: process.env.PATH + ";F:\\openclaw\\npm-global" } }, (err, _stdout, _stderr) => {
+          if (err) {
+            api.logger.error(`Failed to launch browser for ${channelId}: ${err.message}`);
+          }
+        });
+        db.logActivity(channelId, "browser_login", "pending", `Launched browser for ${channel.name} login`);
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ success: true, channelId, loginUrl: channel.loginUrl, message: `Opening ${channel.name} login in OpenClaw browser...` }));
       },
     });
 
