@@ -159,6 +159,38 @@ const DEFAULT_CHANNELS: ChannelConfig[] = [
     monitorUrls: [],
     tier: "session",
   },
+  {
+    id: "gmail",
+    name: "Gmail",
+    loginUrl: "https://accounts.google.com/ServiceLogin?service=mail",
+    loggedInIndicator: "gb_71",
+    loginPageIndicator: "identifierId",
+    monitorUrls: [],
+    tier: "session",
+  },
+  {
+    id: "craigslist",
+    name: "Craigslist",
+    loginUrl: "https://accounts.craigslist.org/login",
+    loggedInIndicator: "al",
+    loginPageIndicator: "inputEmailHandle",
+    monitorUrls: [
+      "https://christchurch.craigslist.org/search/jjj?sort=date",
+      "https://christchurch.craigslist.org/search/ggg?sort=date",
+    ],
+    tier: "session",
+  },
+  {
+    id: "fiverr",
+    name: "Fiverr",
+    loginUrl: "https://www.fiverr.com/login",
+    loggedInIndicator: "avatar-decorator",
+    loginPageIndicator: "login-container",
+    monitorUrls: [
+      "https://www.fiverr.com/categories/programming-tech/web-programming",
+    ],
+    tier: "session",
+  },
 ];
 
 // ============================================================================
