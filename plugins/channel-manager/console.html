@@ -3,219 +3,395 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Channel Manager Console</title>
+  <meta name="color-scheme" content="dark light">
+  <title>Channel Manager — OpenClaw</title>
   <style>
     /* ================================================================
-       THEME: OpenClaw Console — dark, minimal, high-contrast
+       OpenClaw-native CSS variables (matched from Control UI)
        ================================================================ */
     :root {
-      --bg-deep: #0a0e1a;
-      --bg-surface: #111827;
-      --bg-card: #1a2236;
-      --bg-hover: #1f2a40;
-      --text-primary: #f0f2f5;
-      --text-secondary: #8b95a5;
-      --text-muted: #5a6478;
-      --accent: #e04832;          /* lobster red */
-      --accent-glow: rgba(224, 72, 50, 0.15);
-      --accent-hover: #f05a44;
-      --cyan-glow: rgba(56, 189, 248, 0.08);
-      --green: #22c55e;
-      --amber: #f59e0b;
-      --red: #ef4444;
-      --purple: #a855f7;
-      --border: #1e293b;
-      --radius: 6px;
-      --font: 'Segoe UI', -apple-system, sans-serif;
-      --mono: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+      --bg: #111714;
+      --bg-surface: #191f1c;
+      --card: #1c2420;
+      --card-highlight: rgba(255,255,255,0.04);
+      --border: #2a332e;
+      --border-hover: #3a4a42;
+      --text: #e8ece9;
+      --text-secondary: #9ca89f;
+      --text-muted: #6b7a6f;
+      --accent: #4ade80;
+      --accent-dim: rgba(74,222,128,0.12);
+      --danger: #ef4444;
+      --danger-dim: rgba(239,68,68,0.12);
+      --warning: #f59e0b;
+      --warning-dim: rgba(245,158,11,0.12);
+      --purple: #a78bfa;
+      --purple-dim: rgba(167,139,250,0.12);
+      --radius-sm: 6px;
+      --radius-lg: 12px;
+      --shadow-sm: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
+      --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+      --duration-normal: 0.2s;
+      --font: 'Segoe UI', -apple-system, system-ui, sans-serif;
+      --mono: 'Cascadia Code', 'Fira Code', Consolas, monospace;
     }
 
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
     body {
       font-family: var(--font);
-      background: var(--bg-deep);
-      color: var(--text-primary);
+      background: var(--bg);
+      color: var(--text);
       min-height: 100vh;
-      display: flex;
     }
 
     /* ================================================================
-       SIDEBAR
+       SHELL (matches OpenClaw's div.shell layout)
        ================================================================ */
-    .sidebar {
-      width: 220px;
-      background: var(--bg-surface);
-      border-right: 1px solid var(--border);
+    .shell {
       display: flex;
       flex-direction: column;
-      padding: 0;
-      flex-shrink: 0;
+      min-height: 100vh;
     }
 
-    .sidebar-brand {
-      padding: 20px 16px;
+    /* Top bar */
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 24px;
+      background: var(--bg-surface);
       border-bottom: 1px solid var(--border);
     }
 
-    .sidebar-brand h1 {
-      font-size: 14px;
-      font-weight: 600;
-      color: var(--accent);
-      letter-spacing: 0.5px;
-      text-transform: uppercase;
-    }
-
-    .sidebar-brand .sub {
-      font-size: 11px;
-      color: var(--text-muted);
-      margin-top: 2px;
-    }
-
-    .sidebar-nav {
-      list-style: none;
-      padding: 12px 8px;
-      flex: 1;
-    }
-
-    .sidebar-nav li {
-      margin-bottom: 2px;
-    }
-
-    .sidebar-nav a {
+    .topbar-brand {
       display: flex;
       align-items: center;
       gap: 10px;
-      padding: 9px 12px;
-      border-radius: var(--radius);
+    }
+
+    .topbar-brand .logo {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--accent);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    .topbar-brand .sub {
+      font-size: 11px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .topbar-status {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
       color: var(--text-secondary);
-      text-decoration: none;
+    }
+
+    .topbar-status .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 6px var(--accent);
+    }
+
+    .topbar-status .dot.offline {
+      background: var(--danger);
+      box-shadow: 0 0 6px var(--danger);
+    }
+
+    /* Nav tabs (matches OpenClaw's tab row) */
+    .nav-tabs {
+      display: flex;
+      gap: 0;
+      padding: 0 24px;
+      background: var(--bg-surface);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .nav-tabs a {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 10px 16px;
       font-size: 13px;
       font-weight: 500;
-      transition: all 0.15s;
+      color: var(--text-muted);
+      text-decoration: none;
+      border-bottom: 2px solid transparent;
+      transition: all var(--duration-normal) var(--ease-out);
       cursor: pointer;
     }
 
-    .sidebar-nav a:hover {
-      background: var(--bg-hover);
-      color: var(--text-primary);
-    }
-
-    .sidebar-nav a.active {
-      background: var(--accent-glow);
-      color: var(--accent);
-      font-weight: 600;
-    }
-
-    .sidebar-nav .icon {
-      width: 18px;
-      text-align: center;
-      font-size: 14px;
-    }
-
-    /* ================================================================
-       MAIN CONTENT
-       ================================================================ */
-    .main {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-    }
-
-    .topbar {
-      height: 48px;
-      background: var(--bg-surface);
-      border-bottom: 1px solid var(--border);
-      display: flex;
-      align-items: center;
-      padding: 0 24px;
-      justify-content: space-between;
-    }
-
-    .topbar h2 {
-      font-size: 15px;
-      font-weight: 600;
-      color: var(--text-primary);
-    }
-
-    .topbar .status-pill {
-      font-size: 11px;
-      padding: 4px 10px;
-      border-radius: 12px;
-      background: var(--bg-card);
+    .nav-tabs a:hover {
       color: var(--text-secondary);
     }
 
-    .content {
+    .nav-tabs a.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+
+    /* Main content area */
+    .main-content {
       flex: 1;
-      overflow-y: auto;
-      padding: 24px;
+      padding: 32px 24px;
+      max-width: 960px;
+    }
+
+    .page-title {
+      font-size: 28px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .page-sub {
+      font-size: 14px;
+      color: var(--text-muted);
+      margin-bottom: 24px;
     }
 
     /* ================================================================
-       DASHBOARD CARDS
+       CARDS (matched from OpenClaw .card)
        ================================================================ */
-    .card-grid {
+    .grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
       gap: 16px;
+    }
+
+    .card {
+      box-shadow: var(--shadow-sm), inset 0 1px 0 var(--card-highlight);
+      border: 1px solid var(--border);
+      background: var(--card);
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      animation: rise 0.35s var(--ease-out) backwards;
+      transition: border-color var(--duration-normal) var(--ease-out),
+                  box-shadow var(--duration-normal) var(--ease-out),
+                  transform var(--duration-normal) var(--ease-out);
+    }
+
+    .card:hover {
+      border-color: var(--border-hover);
+    }
+
+    .card-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .card-sub {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-bottom: 0;
+    }
+
+    /* Status list (matched from native UI) */
+    .status-list {
+      margin-top: 16px;
+    }
+
+    .status-list > div {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 7px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      font-size: 13px;
+    }
+
+    .status-list > div:last-child {
+      border-bottom: none;
+    }
+
+    .status-list .label {
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+
+    /* Status indicators */
+    .status-val {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 500;
+      font-size: 13px;
+    }
+
+    .status-val::before {
+      content: "";
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+    }
+
+    .status-val.connected { color: var(--accent); }
+    .status-val.connected::before { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+
+    .status-val.unknown { color: var(--warning); }
+    .status-val.unknown::before { background: var(--warning); }
+
+    .status-val.expired { color: var(--danger); }
+    .status-val.expired::before { background: var(--danger); box-shadow: 0 0 6px var(--danger); }
+
+    .status-val.blocked { color: var(--danger); }
+    .status-val.blocked::before { background: var(--danger); }
+
+    .status-val.rate_limited { color: var(--purple); }
+    .status-val.rate_limited::before { background: var(--purple); }
+
+    .status-val.not-configured { color: var(--text-muted); }
+    .status-val.not-configured::before { background: var(--text-muted); }
+
+    /* Tier badge */
+    .tier {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 2px 8px;
+      border-radius: 8px;
+      margin-left: 8px;
+    }
+
+    .tier.session { background: var(--warning-dim); color: var(--warning); }
+    .tier.public { background: var(--accent-dim); color: var(--accent); }
+    .tier.api { background: var(--purple-dim); color: var(--purple); }
+    .tier.not-ready { background: rgba(255,255,255,0.05); color: var(--text-muted); }
+
+    /* ================================================================
+       BUTTONS (matched from OpenClaw .btn)
+       ================================================================ */
+    .row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 14px;
+      font-size: 12px;
+      font-weight: 500;
+      font-family: var(--font);
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all var(--duration-normal) var(--ease-out);
+    }
+
+    .btn:hover {
+      border-color: var(--border-hover);
+      color: var(--text);
+      background: rgba(255,255,255,0.03);
+    }
+
+    .btn.primary {
+      background: var(--accent);
+      color: #111;
+      border-color: var(--accent);
+      font-weight: 600;
+    }
+
+    .btn.primary:hover {
+      filter: brightness(1.1);
+    }
+
+    .btn.danger {
+      color: var(--danger);
+      border-color: rgba(239,68,68,0.3);
+    }
+
+    .btn.danger:hover {
+      background: var(--danger-dim);
+      border-color: var(--danger);
+    }
+
+    /* ================================================================
+       CALLOUTS (matched from native .callout .danger)
+       ================================================================ */
+    .callout {
+      padding: 10px 14px;
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      margin-top: 12px;
+    }
+
+    .callout.danger {
+      background: var(--danger-dim);
+      color: var(--danger);
+      border: 1px solid rgba(239,68,68,0.2);
+    }
+
+    .callout.warning {
+      background: var(--warning-dim);
+      color: var(--warning);
+      border: 1px solid rgba(245,158,11,0.2);
+    }
+
+    .callout.success {
+      background: var(--accent-dim);
+      color: var(--accent);
+      border: 1px solid rgba(74,222,128,0.2);
+    }
+
+    /* ================================================================
+       DASHBOARD STAT CARDS
+       ================================================================ */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 12px;
       margin-bottom: 24px;
     }
 
     .stat-card {
-      background: var(--bg-card);
+      box-shadow: var(--shadow-sm), inset 0 1px 0 var(--card-highlight);
       border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 20px;
-      transition: border-color 0.2s;
+      background: var(--card);
+      border-radius: var(--radius-lg);
+      padding: 16px;
+      animation: rise 0.35s var(--ease-out) backwards;
     }
 
-    .stat-card:hover {
-      border-color: var(--accent);
-      box-shadow: 0 0 12px var(--accent-glow);
-    }
-
-    .stat-card .label {
+    .stat-card .stat-label {
       font-size: 11px;
       color: var(--text-muted);
       text-transform: uppercase;
-      letter-spacing: 0.8px;
-      margin-bottom: 8px;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
     }
 
-    .stat-card .value {
-      font-size: 28px;
+    .stat-card .stat-value {
+      font-size: 26px;
       font-weight: 700;
       font-family: var(--mono);
     }
 
-    .stat-card .value.green { color: var(--green); }
-    .stat-card .value.amber { color: var(--amber); }
-    .stat-card .value.red { color: var(--red); }
+    .stat-value.green { color: var(--accent); }
+    .stat-value.amber { color: var(--warning); }
+    .stat-value.red { color: var(--danger); }
 
     /* ================================================================
        DATA TABLE
        ================================================================ */
-    .section-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 12px;
-    }
-
-    .section-header h3 {
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--text-secondary);
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-
     .data-table {
       width: 100%;
       border-collapse: collapse;
       font-size: 13px;
+      margin-top: 0;
     }
 
     .data-table thead th {
@@ -228,155 +404,44 @@
       letter-spacing: 0.5px;
       border-bottom: 1px solid var(--border);
       background: var(--bg-surface);
-      position: sticky;
-      top: 0;
-      z-index: 1;
     }
 
     .data-table tbody tr {
-      border-bottom: 1px solid var(--border);
+      border-bottom: 1px solid rgba(255,255,255,0.03);
       transition: background 0.1s;
     }
 
     .data-table tbody tr:hover {
-      background: var(--cyan-glow);
+      background: rgba(255,255,255,0.02);
     }
 
     .data-table td {
-      padding: 12px 14px;
-      color: var(--text-primary);
-      vertical-align: middle;
+      padding: 10px 14px;
+      color: var(--text);
     }
 
-    /* Status dots */
-    .status-dot {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 12px;
-      font-weight: 500;
-    }
-
-    .status-dot::before {
-      content: "";
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      display: inline-block;
-    }
-
-    .status-dot.connected::before { background: var(--green); box-shadow: 0 0 6px var(--green); }
-    .status-dot.unknown::before { background: var(--amber); }
-    .status-dot.expired::before { background: var(--red); box-shadow: 0 0 6px var(--red); }
-    .status-dot.blocked::before { background: var(--red); }
-    .status-dot.rate_limited::before { background: var(--purple); }
-    .status-dot.not-configured::before { background: var(--text-muted); }
-
-    /* Tier badges */
-    .tier-badge {
-      font-size: 10px;
-      padding: 2px 8px;
-      border-radius: 10px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.3px;
-    }
-
-    .tier-badge.session { background: rgba(224, 72, 50, 0.15); color: var(--accent); }
-    .tier-badge.public { background: rgba(34, 197, 94, 0.15); color: var(--green); }
-    .tier-badge.api { background: rgba(168, 85, 247, 0.15); color: var(--purple); }
-    .tier-badge.not-ready { background: rgba(90, 100, 120, 0.15); color: var(--text-muted); }
-
-    /* Action buttons */
-    .btn {
-      padding: 5px 12px;
-      border-radius: var(--radius);
-      border: 1px solid var(--border);
-      background: var(--bg-card);
-      color: var(--text-secondary);
-      font-size: 11px;
-      font-weight: 500;
-      cursor: pointer;
-      transition: all 0.15s;
-      margin-right: 4px;
-    }
-
-    .btn:hover {
-      background: var(--bg-hover);
-      color: var(--text-primary);
-      border-color: var(--text-muted);
-    }
-
-    .btn.primary {
-      background: var(--accent);
-      color: white;
-      border-color: var(--accent);
-    }
-
-    .btn.primary:hover {
-      background: var(--accent-hover);
-    }
-
-    /* ================================================================
-       LEADS TABLE
-       ================================================================ */
-    .lead-source {
+    .data-table .source {
       font-family: var(--mono);
       font-size: 11px;
       color: var(--accent);
     }
 
-    .lead-title a {
-      color: var(--text-primary);
+    .data-table a {
+      color: var(--text);
       text-decoration: none;
     }
 
-    .lead-title a:hover {
+    .data-table a:hover {
       color: var(--accent);
-      text-decoration: underline;
     }
 
     .hot-badge {
       font-size: 10px;
       padding: 2px 6px;
-      border-radius: 8px;
-      background: rgba(239, 68, 68, 0.15);
-      color: var(--red);
+      border-radius: 6px;
+      background: var(--danger-dim);
+      color: var(--danger);
       font-weight: 600;
-    }
-
-    /* ================================================================
-       VIEWS
-       ================================================================ */
-    .view { display: none; }
-    .view.active { display: block; }
-
-    /* ================================================================
-       ACTION REQUIRED LIST
-       ================================================================ */
-    .action-list {
-      list-style: none;
-      padding: 0;
-    }
-
-    .action-list li {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 10px 14px;
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      margin-bottom: 6px;
-      font-size: 13px;
-    }
-
-    .action-list li .warn-icon {
-      color: var(--amber);
-    }
-
-    .action-list li .err-icon {
-      color: var(--red);
     }
 
     /* ================================================================
@@ -384,434 +449,338 @@
        ================================================================ */
     .toast-container {
       position: fixed;
-      top: 16px;
-      right: 16px;
+      bottom: 20px;
+      right: 20px;
       z-index: 9999;
     }
 
     .toast {
-      background: var(--bg-card);
+      background: var(--card);
       border: 1px solid var(--border);
-      border-left: 3px solid var(--green);
+      border-left: 3px solid var(--accent);
       padding: 12px 16px;
-      border-radius: var(--radius);
-      margin-bottom: 8px;
+      border-radius: var(--radius-sm);
+      margin-top: 8px;
       font-size: 13px;
-      animation: slideIn 0.2s ease;
-      max-width: 320px;
+      color: var(--text);
+      animation: slideUp 0.25s var(--ease-out);
+      max-width: 360px;
+      box-shadow: var(--shadow-sm);
     }
 
-    .toast.error { border-left-color: var(--red); }
+    .toast.error { border-left-color: var(--danger); }
 
-    @keyframes slideIn {
-      from { transform: translateX(100%); opacity: 0; }
-      to { transform: translateX(0); opacity: 1; }
+    @keyframes slideUp {
+      from { transform: translateY(20px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
     }
 
-    /* ================================================================
-       LOADING
-       ================================================================ */
-    .loading {
-      text-align: center;
-      padding: 40px;
-      color: var(--text-muted);
-      font-size: 13px;
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
     }
 
-    .loading::before {
-      content: "⟳";
-      display: block;
-      font-size: 24px;
-      margin-bottom: 8px;
-      animation: spin 1s linear infinite;
-    }
+    /* Views */
+    .view { display: none; }
+    .view.active { display: block; }
 
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-
-    /* ================================================================
-       EMPTY STATE
-       ================================================================ */
-    .empty-state {
-      text-align: center;
-      padding: 60px 20px;
-      color: var(--text-muted);
-    }
-
-    .empty-state .icon { font-size: 32px; margin-bottom: 12px; }
-    .empty-state p { font-size: 13px; }
-
-    /* ================================================================
-       RESPONSIVE
-       ================================================================ */
-    @media (max-width: 768px) {
-      .sidebar { width: 56px; }
-      .sidebar-brand h1, .sidebar-brand .sub, .sidebar-nav .label { display: none; }
-      .sidebar-nav a { justify-content: center; padding: 12px; }
-      .card-grid { grid-template-columns: 1fr 1fr; }
+    @media (max-width: 640px) {
+      .grid { grid-template-columns: 1fr; }
+      .stat-grid { grid-template-columns: repeat(2, 1fr); }
+      .main-content { padding: 20px 16px; }
     }
   </style>
 </head>
 <body>
+  <div class="shell">
 
-  <!-- SIDEBAR -->
-  <nav class="sidebar">
-    <div class="sidebar-brand">
-      <h1>Channel Mgr</h1>
-      <div class="sub">OpenClaw Console</div>
-    </div>
-    <ul class="sidebar-nav">
-      <li><a href="#" data-view="dashboard" class="active"><span class="icon">◉</span><span class="label">Dashboard</span></a></li>
-      <li><a href="#" data-view="channels"><span class="icon">⊞</span><span class="label">Channels</span></a></li>
-      <li><a href="#" data-view="leads"><span class="icon">◈</span><span class="label">Leads</span></a></li>
-      <li><a href="#" data-view="sessions"><span class="icon">⊡</span><span class="label">Sessions</span></a></li>
-    </ul>
-  </nav>
-
-  <!-- MAIN -->
-  <div class="main">
+    <!-- TOP BAR -->
     <header class="topbar">
-      <h2 id="page-title">Dashboard</h2>
-      <span class="status-pill" id="gateway-status">Gateway: checking…</span>
+      <div class="topbar-brand">
+        <span class="logo">OpenClaw</span>
+        <span class="sub">Channel Manager</span>
+      </div>
+      <div class="topbar-status" id="gateway-status">
+        <span class="dot"></span>
+        <span>checking…</span>
+      </div>
     </header>
 
-    <div class="content">
+    <!-- NAV TABS -->
+    <nav class="nav-tabs">
+      <a data-view="dashboard" class="active">◉ Dashboard</a>
+      <a data-view="channels">⊞ Channels</a>
+      <a data-view="leads">◈ Leads</a>
+      <a data-view="sessions">▤ Sessions</a>
+    </nav>
 
-      <!-- ============ DASHBOARD VIEW ============ -->
-      <div id="view-dashboard" class="view active">
-        <div class="card-grid" id="dash-cards">
-          <div class="stat-card"><div class="label">Connected</div><div class="value green" id="stat-connected">—</div></div>
-          <div class="stat-card"><div class="label">Unknown / Expired</div><div class="value amber" id="stat-issues">—</div></div>
-          <div class="stat-card"><div class="label">Total Leads</div><div class="value" id="stat-leads">—</div></div>
-          <div class="stat-card"><div class="label">Leads Today</div><div class="value" id="stat-leads-today">—</div></div>
-          <div class="stat-card"><div class="label">Hot Leads</div><div class="value red" id="stat-hot">—</div></div>
+    <!-- CONTENT -->
+    <main class="main-content">
+
+      <!-- ============ DASHBOARD ============ -->
+      <section id="view-dashboard" class="view active">
+        <h1 class="page-title">Dashboard</h1>
+        <p class="page-sub">Channel health overview and action items.</p>
+
+        <div class="stat-grid">
+          <div class="stat-card">
+            <div class="stat-label">Connected</div>
+            <div class="stat-value green" id="stat-connected">—</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Needs Attention</div>
+            <div class="stat-value amber" id="stat-issues">—</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Total Leads</div>
+            <div class="stat-value" id="stat-leads">—</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Today</div>
+            <div class="stat-value" id="stat-today">—</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Hot Leads</div>
+            <div class="stat-value red" id="stat-hot">—</div>
+          </div>
         </div>
 
-        <div class="section-header">
-          <h3>Action Required</h3>
-          <button class="btn primary" onclick="refreshAll()">⟳ Refresh</button>
+        <div class="row" style="justify-content: space-between; margin-bottom: 12px;">
+          <h2 style="font-size: 14px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Action Required</h2>
+          <button class="btn primary" onclick="refreshAll()">Refresh</button>
         </div>
-        <ul class="action-list" id="action-list">
-          <li class="loading">Loading…</li>
-        </ul>
-      </div>
 
-      <!-- ============ CHANNELS VIEW ============ -->
-      <div id="view-channels" class="view">
-        <div class="section-header">
-          <h3>All Channels</h3>
-          <button class="btn primary" onclick="refreshAll()">⟳ Refresh</button>
+        <div id="action-cards" class="grid"></div>
+      </section>
+
+      <!-- ============ CHANNELS ============ -->
+      <section id="view-channels" class="view">
+        <div class="row" style="justify-content: space-between; margin-bottom: 20px;">
+          <div>
+            <h1 class="page-title">Channels</h1>
+            <p class="page-sub" style="margin-bottom:0;">Manage channels and settings.</p>
+          </div>
+          <button class="btn primary" onclick="refreshAll()">Refresh</button>
         </div>
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Channel</th>
-              <th>Type</th>
-              <th>Status</th>
-              <th>Last Checked</th>
-              <th>Last Auth</th>
-              <th>Failures</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody id="channels-tbody">
-            <tr><td colspan="7" class="loading">Loading…</td></tr>
-          </tbody>
-        </table>
-      </div>
+        <div class="grid" id="channel-cards"></div>
+      </section>
 
-      <!-- ============ LEADS VIEW ============ -->
-      <div id="view-leads" class="view">
-        <div class="section-header">
-          <h3>Recent Leads</h3>
-          <button class="btn primary" onclick="refreshAll()">⟳ Refresh</button>
+      <!-- ============ LEADS ============ -->
+      <section id="view-leads" class="view">
+        <div class="row" style="justify-content: space-between; margin-bottom: 20px;">
+          <div>
+            <h1 class="page-title">Leads</h1>
+            <p class="page-sub" style="margin-bottom:0;">Recent lead captures across all channels.</p>
+          </div>
+          <button class="btn primary" onclick="refreshAll()">Refresh</button>
         </div>
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Source</th>
-              <th>Title</th>
-              <th>Budget</th>
-              <th>Location</th>
-              <th>Hot</th>
-              <th>Time</th>
-            </tr>
-          </thead>
-          <tbody id="leads-tbody">
-            <tr><td colspan="6" class="loading">Loading…</td></tr>
-          </tbody>
-        </table>
-      </div>
-
-      <!-- ============ SESSIONS VIEW ============ -->
-      <div id="view-sessions" class="view">
-        <div class="section-header">
-          <h3>Session Details</h3>
-          <button class="btn primary" onclick="refreshAll()">⟳ Refresh</button>
+        <div class="card" style="padding: 0; overflow: hidden;">
+          <table class="data-table">
+            <thead>
+              <tr><th>Source</th><th>Title</th><th>Budget</th><th>Location</th><th>Hot</th><th>Time</th></tr>
+            </thead>
+            <tbody id="leads-tbody">
+              <tr><td colspan="6" style="text-align:center; padding:40px; color:var(--text-muted);">Loading…</td></tr>
+            </tbody>
+          </table>
         </div>
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Channel</th>
-              <th>Status</th>
-              <th>Last Login</th>
-              <th>Last Confirmed</th>
-              <th>Failures</th>
-              <th>Notes</th>
-            </tr>
-          </thead>
-          <tbody id="sessions-tbody">
-            <tr><td colspan="6" class="loading">Loading…</td></tr>
-          </tbody>
-        </table>
-      </div>
+      </section>
 
-    </div>
+      <!-- ============ SESSIONS ============ -->
+      <section id="view-sessions" class="view">
+        <div class="row" style="justify-content: space-between; margin-bottom: 20px;">
+          <div>
+            <h1 class="page-title">Sessions</h1>
+            <p class="page-sub" style="margin-bottom:0;">Session state for each channel.</p>
+          </div>
+          <button class="btn primary" onclick="refreshAll()">Refresh</button>
+        </div>
+        <div class="grid" id="session-cards"></div>
+      </section>
+
+    </main>
   </div>
 
   <div class="toast-container" id="toasts"></div>
 
   <script>
-    // ================================================================
-    // CONFIG
-    // ================================================================
     const API_BASE = window.location.origin + "/__openclaw__/channel-manager/api";
-
-    // ================================================================
-    // STATE
-    // ================================================================
     let channels = [];
     let leads = [];
     let leadCounts = { total: 0, hot: 0, today: 0 };
 
-    // ================================================================
-    // NAVIGATION
-    // ================================================================
+    // NAV
     document.querySelectorAll("[data-view]").forEach(link => {
-      link.addEventListener("click", (e) => {
+      link.addEventListener("click", e => {
         e.preventDefault();
-        const viewId = link.dataset.view;
-
-        // Update nav
+        const id = link.dataset.view;
         document.querySelectorAll("[data-view]").forEach(l => l.classList.remove("active"));
         link.classList.add("active");
-
-        // Update view
         document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
-        document.getElementById("view-" + viewId).classList.add("active");
-
-        // Update title
-        document.getElementById("page-title").textContent =
-          viewId.charAt(0).toUpperCase() + viewId.slice(1);
+        document.getElementById("view-" + id).classList.add("active");
       });
     });
 
-    // ================================================================
-    // DATA FETCHING
-    // ================================================================
+    // FETCH
     async function fetchChannels() {
       try {
-        const res = await fetch(API_BASE + "/channels");
-        channels = await res.json();
-        renderDashboard();
-        renderChannels();
-        renderSessions();
-      } catch (err) {
-        showToast("Failed to fetch channels: " + err.message, true);
-      }
+        const r = await fetch(API_BASE + "/channels");
+        channels = await r.json();
+        renderDashboard(); renderChannels(); renderSessions();
+      } catch (e) { showToast("Failed to load channels: " + e.message, true); }
     }
 
     async function fetchLeads() {
       try {
-        const res = await fetch(API_BASE + "/leads");
-        const data = await res.json();
-        leads = data.leads || [];
-        leadCounts = data.counts || { total: 0, hot: 0, today: 0 };
-        renderDashboard();
-        renderLeads();
-      } catch (err) {
-        showToast("Failed to fetch leads: " + err.message, true);
-      }
+        const r = await fetch(API_BASE + "/leads");
+        const d = await r.json();
+        leads = d.leads || []; leadCounts = d.counts || { total: 0, hot: 0, today: 0 };
+        renderDashboard(); renderLeads();
+      } catch (e) { showToast("Failed to load leads: " + e.message, true); }
     }
 
-    async function confirmChannel(channelId) {
+    async function confirmChannel(id) {
       try {
-        const res = await fetch(API_BASE + "/channels/" + channelId + "/confirm", { method: "POST" });
-        if (res.ok) {
-          showToast(channelId + " confirmed as connected");
-          await fetchChannels();
-        } else {
-          showToast("Confirm failed: " + res.statusText, true);
-        }
-      } catch (err) {
-        showToast("Confirm error: " + err.message, true);
-      }
+        const r = await fetch(API_BASE + "/channels/" + id + "/confirm", { method: "POST" });
+        if (r.ok) { showToast(id + " confirmed as connected"); await fetchChannels(); }
+        else showToast("Confirm failed", true);
+      } catch (e) { showToast("Error: " + e.message, true); }
     }
 
-    function refreshAll() {
-      fetchChannels();
-      fetchLeads();
-    }
+    function refreshAll() { fetchChannels(); fetchLeads(); }
 
-    // ================================================================
-    // RENDERERS
-    // ================================================================
+    // RENDER: Dashboard
     function renderDashboard() {
-      const connected = channels.filter(c => c.status === "connected").length;
+      const conn = channels.filter(c => c.status === "connected").length;
       const issues = channels.filter(c => c.status !== "connected").length;
-
-      document.getElementById("stat-connected").textContent = connected;
+      document.getElementById("stat-connected").textContent = conn;
       document.getElementById("stat-issues").textContent = issues;
       document.getElementById("stat-leads").textContent = leadCounts.total;
-      document.getElementById("stat-leads-today").textContent = leadCounts.today;
+      document.getElementById("stat-today").textContent = leadCounts.today;
       document.getElementById("stat-hot").textContent = leadCounts.hot;
 
-      // Action required list
-      const actionList = document.getElementById("action-list");
-      const actions = channels.filter(c => c.status !== "connected");
-
-      if (actions.length === 0) {
-        actionList.innerHTML = '<li style="color: var(--green);">✓ All channels connected. Ready to run Scout.</li>';
+      const box = document.getElementById("action-cards");
+      const need = channels.filter(c => c.status !== "connected");
+      if (!need.length) {
+        box.innerHTML = '<div class="card"><div class="callout success">All channels connected. Safe to run Scout.</div></div>';
         return;
       }
-
-      actionList.innerHTML = actions.map(ch => {
-        const icon = ch.status === "expired"
-          ? '<span class="err-icon">✕</span>'
-          : '<span class="warn-icon">⚠</span>';
-        const action = ch.status === "expired" ? "Reconnect needed" : "Confirm required";
-        return `<li>${icon} <strong>${ch.name}</strong> — ${action} (${ch.status}) <button class="btn" onclick="confirmChannel('${ch.id}')" style="margin-left:auto;">Confirm</button></li>`;
-      }).join("");
+      box.innerHTML = need.map(ch => `
+        <div class="card">
+          <div class="card-title">${esc(ch.name)} <span class="tier ${ch.tier}">${ch.tier}</span></div>
+          <div class="card-sub">${ch.status === "expired" ? "Session expired — reconnect needed" : "Not yet confirmed"}</div>
+          <div class="callout ${ch.status === "expired" ? "danger" : "warning"}">Status: ${ch.status} · Failures: ${ch.failureCount || 0}</div>
+          <div class="row" style="margin-top: 14px;">
+            <button class="btn primary" onclick="confirmChannel('${ch.id}')">Confirm</button>
+            <button class="btn" onclick="copyCmd('${ch.loginUrl}')">Copy Login CMD</button>
+          </div>
+        </div>`).join("");
     }
 
+    // RENDER: Channel Cards (native card layout like WhatsApp/Telegram)
     function renderChannels() {
-      const tbody = document.getElementById("channels-tbody");
-
-      if (channels.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><div class="icon">⊞</div><p>No channels configured</p></div></td></tr>';
+      const box = document.getElementById("channel-cards");
+      if (!channels.length) {
+        box.innerHTML = '<div class="card"><div class="card-sub" style="text-align:center;padding:20px;">No channels configured.</div></div>';
         return;
       }
-
-      tbody.innerHTML = channels.map(ch => `
-        <tr>
-          <td><strong>${ch.name}</strong></td>
-          <td><span class="tier-badge ${ch.tier}">${ch.tier}</span></td>
-          <td><span class="status-dot ${ch.status}">${ch.status}</span></td>
-          <td>${timeAgo(ch.lastCheckedAt)}</td>
-          <td>${timeAgo(ch.lastAuthenticatedAt)}</td>
-          <td>${ch.failureCount || 0}</td>
-          <td>
-            <button class="btn" onclick="confirmChannel('${ch.id}')">Confirm</button>
+      box.innerHTML = channels.map(ch => `
+        <div class="card">
+          <div class="card-title">${esc(ch.name)} <span class="tier ${ch.tier}">${ch.tier}</span></div>
+          <div class="card-sub">${tierDesc(ch.tier)} channel${ch.monitorUrls ? " · " + ch.monitorUrls.length + " URLs" : ""}</div>
+          <div class="status-list" style="margin-top: 16px;">
+            <div><span class="label">Status</span><span class="status-val ${ch.status}">${ch.status}</span></div>
+            <div><span class="label">Last checked</span><span>${timeAgo(ch.lastCheckedAt)}</span></div>
+            <div><span class="label">Last auth</span><span>${timeAgo(ch.lastAuthenticatedAt)}</span></div>
+            <div><span class="label">Failures</span><span>${ch.failureCount || 0}</span></div>
+          </div>
+          <div class="row" style="margin-top: 14px; flex-wrap: wrap;">
+            <button class="btn primary" onclick="confirmChannel('${ch.id}')">Confirm</button>
             <button class="btn" onclick="copyCmd('${ch.loginUrl}')">Login URL</button>
-          </td>
-        </tr>
-      `).join("");
+            ${ch.status === "expired" ? '<button class="btn danger" onclick="copyCmd(\'' + ch.loginUrl + '\')">Reconnect</button>' : ''}
+            <button class="btn" onclick="refreshAll()">Refresh</button>
+          </div>
+        </div>`).join("");
     }
 
-    function renderLeads() {
-      const tbody = document.getElementById("leads-tbody");
-
-      if (leads.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><div class="icon">◈</div><p>No leads yet</p></div></td></tr>';
-        return;
-      }
-
-      tbody.innerHTML = leads.map(lead => `
-        <tr>
-          <td><span class="lead-source">${lead.source}</span></td>
-          <td class="lead-title"><a href="${lead.url}" target="_blank">${escHtml(lead.title)}</a></td>
-          <td>${lead.budget || "—"}</td>
-          <td>${lead.location || "—"}</td>
-          <td>${lead.hotLead ? '<span class="hot-badge">HOT</span>' : "—"}</td>
-          <td>${timeAgo(lead.timestamp)}</td>
-        </tr>
-      `).join("");
-    }
-
+    // RENDER: Sessions
     function renderSessions() {
-      const tbody = document.getElementById("sessions-tbody");
-      // Sessions are derived from channel data (channel+session join)
-      const sessionData = channels.filter(ch => ch.lastCheckedAt || ch.status !== "unknown");
-
-      if (sessionData.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><div class="icon">⊡</div><p>No session data</p></div></td></tr>';
+      const box = document.getElementById("session-cards");
+      const data = channels.filter(ch => ch.lastCheckedAt || ch.status !== "unknown");
+      if (!data.length) {
+        box.innerHTML = '<div class="card"><div class="card-sub" style="text-align:center;padding:20px;">No session data yet.</div></div>';
         return;
       }
+      box.innerHTML = data.map(ch => `
+        <div class="card">
+          <div class="card-title">${esc(ch.name)}</div>
+          <div class="status-list" style="margin-top: 12px;">
+            <div><span class="label">Status</span><span class="status-val ${ch.status}">${ch.status}</span></div>
+            <div><span class="label">Last login</span><span>${timeAgo(ch.lastAuthenticatedAt)}</span></div>
+            <div><span class="label">Last confirmed</span><span>${timeAgo(ch.lastCheckedAt)}</span></div>
+            <div><span class="label">Failures</span><span>${ch.failureCount || 0}</span></div>
+          </div>
+        </div>`).join("");
+    }
 
-      tbody.innerHTML = sessionData.map(ch => `
+    // RENDER: Leads
+    function renderLeads() {
+      const tb = document.getElementById("leads-tbody");
+      if (!leads.length) {
+        tb.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:40px;color:var(--text-muted);">No leads captured yet.</td></tr>';
+        return;
+      }
+      tb.innerHTML = leads.map(l => `
         <tr>
-          <td><strong>${ch.name}</strong></td>
-          <td><span class="status-dot ${ch.status}">${ch.status}</span></td>
-          <td>${timeAgo(ch.lastAuthenticatedAt)}</td>
-          <td>${timeAgo(ch.lastCheckedAt)}</td>
-          <td>${ch.failureCount || 0}</td>
-          <td style="color: var(--text-muted); font-size: 12px;">${ch.sessionNotes || "—"}</td>
-        </tr>
-      `).join("");
+          <td class="source">${esc(l.source)}</td>
+          <td><a href="${esc(l.url)}" target="_blank">${esc(l.title)}</a></td>
+          <td>${l.budget || "—"}</td>
+          <td>${l.location || "—"}</td>
+          <td>${l.hotLead ? '<span class="hot-badge">HOT</span>' : "—"}</td>
+          <td style="color:var(--text-muted);">${timeAgo(l.timestamp)}</td>
+        </tr>`).join("");
     }
 
-    // ================================================================
     // UTILITIES
-    // ================================================================
-    function timeAgo(isoStr) {
-      if (!isoStr) return '<span style="color: var(--text-muted);">never</span>';
-      const d = new Date(isoStr);
-      const now = new Date();
-      const diff = Math.floor((now - d) / 1000);
-      if (diff < 60) return diff + "s ago";
-      if (diff < 3600) return Math.floor(diff / 60) + "m ago";
-      if (diff < 86400) return Math.floor(diff / 3600) + "h ago";
-      return Math.floor(diff / 86400) + "d ago";
+    function timeAgo(iso) {
+      if (!iso) return '<span style="color:var(--text-muted)">n/a</span>';
+      const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+      if (s < 60) return s + "s ago";
+      if (s < 3600) return Math.floor(s / 60) + "m ago";
+      if (s < 86400) return Math.floor(s / 3600) + "h ago";
+      return Math.floor(s / 86400) + "d ago";
     }
 
-    function escHtml(str) {
-      const d = document.createElement("div");
-      d.textContent = str || "";
-      return d.innerHTML;
-    }
+    function esc(s) { const d = document.createElement("div"); d.textContent = s || ""; return d.innerHTML; }
+    function tierDesc(t) { return { session: "Session-tier", public: "Public", api: "API-based", "not-ready": "Not ready" }[t] || t; }
 
     function copyCmd(url) {
-      const cmd = `npx openclaw browser open "${url}" --profile openclaw`;
-      navigator.clipboard.writeText(cmd).then(() => {
-        showToast("Copied: " + cmd);
-      }).catch(() => {
-        prompt("Copy this command:", cmd);
-      });
+      const cmd = 'npx openclaw browser open "' + url + '" --profile openclaw';
+      navigator.clipboard.writeText(cmd).then(() => showToast("Copied: " + cmd)).catch(() => prompt("Copy:", cmd));
     }
 
-    function showToast(msg, isError = false) {
-      const container = document.getElementById("toasts");
-      const toast = document.createElement("div");
-      toast.className = "toast" + (isError ? " error" : "");
-      toast.textContent = msg;
-      container.appendChild(toast);
-      setTimeout(() => toast.remove(), 4000);
+    function showToast(msg, err) {
+      const el = document.createElement("div");
+      el.className = "toast" + (err ? " error" : "");
+      el.textContent = msg;
+      document.getElementById("toasts").appendChild(el);
+      setTimeout(() => el.remove(), 4000);
     }
 
-    // ================================================================
-    // GATEWAY STATUS CHECK
-    // ================================================================
+    // GATEWAY STATUS
     async function checkGateway() {
+      const el = document.getElementById("gateway-status");
       try {
-        const res = await fetch(API_BASE + "/channels");
-        if (res.ok) {
-          document.getElementById("gateway-status").textContent = "Gateway: online";
-          document.getElementById("gateway-status").style.color = "var(--green)";
-        }
-      } catch {
-        document.getElementById("gateway-status").textContent = "Gateway: offline";
-        document.getElementById("gateway-status").style.color = "var(--red)";
-      }
+        const r = await fetch(API_BASE + "/channels");
+        el.innerHTML = r.ok
+          ? '<span class="dot"></span> Health OK'
+          : '<span class="dot offline"></span> Error';
+      } catch { el.innerHTML = '<span class="dot offline"></span> Offline'; }
     }
 
-    // ================================================================
     // INIT
-    // ================================================================
     checkGateway();
     refreshAll();
-
-    // Auto-refresh every 30s
     setInterval(refreshAll, 30000);
   </script>
 </body>
