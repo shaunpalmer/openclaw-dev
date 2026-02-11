@@ -393,6 +393,75 @@ class SessionDB {
 }
 
 // ============================================================================
+// Native Channel Registration — ChannelPlugin builder
+// ============================================================================
+
+/**
+ * Tier-to-type mapping for the native UI.
+ * OpenClaw's ChannelPlugin expects the tier description, not our internal tier value.
+ */
+const TIER_DETAIL_LABEL: Record<string, string> = {
+  public: "Public Scraper",
+  session: "Session-Based",
+  "not-ready": "Not Ready",
+};
+
+/**
+ * Build a ChannelPlugin-compatible object for one of our channels.
+ * This is what api.registerChannel() needs to make the channel
+ * appear natively in the Control UI Channels page.
+ *
+ * The generic card renderer (Yp) will show:
+ *   - Card title (from meta.label)
+ *   - Configured / Running / Connected status
+ *   - Error callout if lastError is set
+ */
+function buildChannelPlugin(channel: ChannelConfig, db: SessionDB) {
+  return {
+    id: channel.id,
+    meta: {
+      id: channel.id,
+      label: channel.name,
+      detailLabel: `${channel.name} — ${TIER_DETAIL_LABEL[channel.tier] || channel.tier}`,
+      blurb: `${channel.name} channel managed by Channel Manager plugin.`,
+      // Sort after built-in channels (0–7). Group by tier: session=100, public=110
+      order: channel.tier === "session" ? 100 : 110,
+    },
+    // Required: OpenClaw's dock system reads capabilities off the plugin object.
+    // Without this, buildDockFromPlugin() sets capabilities=undefined and
+    // dock.capabilities.nativeCommands crashes the heartbeat.
+    capabilities: {},
+    config: {
+      listAccountIds: (_cfg: any) => ["default"],
+      resolveAccount: (_cfg: any, accountId: string) => ({
+        accountId,
+        enabled: true,
+      }),
+      defaultAccountId: (_cfg: any) => "default",
+      isConfigured: (_account: any) => true,
+    },
+    status: {
+      buildChannelSummary: async (_params: any) => {
+        const session = db.getSession(channel.id);
+        const connected = session?.status === "connected";
+        const expired = session?.status === "expired";
+        const blocked = session?.status === "blocked";
+        return {
+          configured: true,
+          running: false,
+          connected,
+          lastError: expired
+            ? "Session expired — re-login required"
+            : blocked
+              ? "Channel blocked"
+              : undefined,
+        };
+      },
+    },
+  };
+}
+
+// ============================================================================
 // Plugin Registration
 // ============================================================================
 
@@ -427,6 +496,19 @@ const plugin = {
     for (const ch of DEFAULT_CHANNELS) {
       db.upsertChannel(ch);
     }
+
+    // ========================================================================
+    // Register each channel natively with OpenClaw's channel system
+    // This makes them appear in the Control UI Channels page alongside
+    // WhatsApp, Telegram, Discord, etc.
+    // ========================================================================
+
+    for (const ch of DEFAULT_CHANNELS) {
+      api.registerChannel({
+        plugin: buildChannelPlugin(ch, db),
+      });
+    }
+    api.logger.info(`Channel Manager: registered ${DEFAULT_CHANNELS.length} native channels`);
 
     // ========================================================================
     // Tool: channel_status — Scout checks this before scraping
