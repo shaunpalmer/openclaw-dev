@@ -191,6 +191,41 @@ const DEFAULT_CHANNELS: ChannelConfig[] = [
     ],
     tier: "session",
   },
+  {
+    id: "gumtree",
+    name: "Gumtree",
+    loginUrl: "https://www.gumtree.co.nz/login",
+    loggedInIndicator: "my-gumtree",
+    loginPageIndicator: "login-form",
+    monitorUrls: [
+      "https://www.gumtree.co.nz/s-jobs/christchurch/v1c9302l3100214p1?sort=date",
+      "https://www.gumtree.co.nz/s-services/christchurch/v1c9296l3100214p1?sort=date",
+    ],
+    tier: "session",
+  },
+  {
+    id: "upwork",
+    name: "Upwork",
+    loginUrl: "https://www.upwork.com/ab/account-security/login",
+    loggedInIndicator: "nav-user",
+    loginPageIndicator: "login_username",
+    monitorUrls: [
+      "https://www.upwork.com/nx/search/jobs/?sort=recency&category2_uid=531770282584862721",
+    ],
+    tier: "session",
+  },
+  {
+    id: "freelancer",
+    name: "Freelancer",
+    loginUrl: "https://www.freelancer.com/login",
+    loggedInIndicator: "user-avatar",
+    loginPageIndicator: "login-email",
+    monitorUrls: [
+      "https://www.freelancer.com/jobs/website-design/?sort=latest",
+      "https://www.freelancer.com/jobs/web-scraping/?sort=latest",
+    ],
+    tier: "session",
+  },
 ];
 
 // ============================================================================
