@@ -894,9 +894,12 @@ const plugin = {
           return;
         }
         // Spawn openclaw browser open in the background — opens the login page
-        // in OpenClaw's own Chrome profile so cookies persist for Scout
-        const cmd = `npx openclaw browser open "${channel.loginUrl}" --profile chrome`;
-        exec(cmd, { env: { ...process.env, PATH: process.env.PATH + ";F:\\openclaw\\npm-global" } }, (err, _stdout, _stderr) => {
+        // in OpenClaw's own Chrome profile so cookies persist for Scout.
+        // Uses process.execPath to find the node binary, then resolves openclaw
+        // from wherever it was installed — no hardcoded paths.
+        const openclawBin = path.join(path.dirname(process.execPath), "npx");
+        const cmd = `"${openclawBin}" openclaw browser open "${channel.loginUrl}" --profile chrome`;
+        exec(cmd, (err, _stdout, _stderr) => {
           if (err) {
             api.logger.error(`Failed to launch browser for ${channelId}: ${err.message}`);
           }
