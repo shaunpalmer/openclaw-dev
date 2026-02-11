@@ -1,0 +1,20 @@
+{
+  "name": "channel-manager",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Channel session manager plugin for OpenClaw — manages browser-based logins, session persistence, lead storage, and channel health for Scout automation.",
+  "type": "module",
+  "main": "index.ts",
+  "dependencies": {
+    "@sinclair/typebox": "^0.34.48",
+    "better-sqlite3": "^11.10.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.0"
+  },
+  "openclaw": {
+    "extensions": [
+      "./index.ts"
+    ]
+  }
+}

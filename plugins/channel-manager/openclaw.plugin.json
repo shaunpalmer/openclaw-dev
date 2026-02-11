@@ -1,0 +1,40 @@
+{
+  "id": "channel-manager",
+  "name": "Channel Manager",
+  "version": "0.1.0",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "dbPath": {
+        "type": "string",
+        "description": "Path to SQLite database for sessions, leads, and long-term memory"
+      },
+      "browserProfile": {
+        "type": "string",
+        "description": "Browser profile name to use for authenticated sessions"
+      },
+      "sessionCheckInterval": {
+        "type": "string",
+        "description": "How often to verify session health (e.g. 30m, 1h)"
+      }
+    }
+  },
+  "uiHints": {
+    "dbPath": {
+      "label": "Database Path",
+      "placeholder": "~/.openclaw/channel-manager/sessions.db",
+      "advanced": true
+    },
+    "browserProfile": {
+      "label": "Browser Profile",
+      "placeholder": "openclaw",
+      "help": "The browser profile used for channel sessions"
+    },
+    "sessionCheckInterval": {
+      "label": "Session Check Interval",
+      "placeholder": "1h",
+      "help": "How often to verify active sessions are still valid"
+    }
+  }
+}
