@@ -711,6 +711,37 @@ const plugin = {
       },
     });
 
+    // Confirm channel (POST)
+    api.registerHttpRoute({
+      path: "/__openclaw__/channel-manager/api/channels/:channelId/confirm",
+      handler: (req, res) => {
+        const url = new URL(req.url || "", "http://localhost");
+        const parts = url.pathname.split("/");
+        // path: ...api/channels/<id>/confirm → id is at index -2
+        const channelId = parts[parts.length - 2];
+        db.updateSession(channelId, "connected", "Confirmed via console UI");
+        db.logActivity(channelId, "confirm", "connected", "Confirmed via console UI");
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ success: true, channelId, status: "connected" }));
+      },
+    });
+
+    // Serve the console UI
+    api.registerHttpRoute({
+      path: "/__openclaw__/channel-manager/console",
+      handler: (_req, res) => {
+        const htmlPath = path.join(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Z]:)/, "$1")), "console.html");
+        try {
+          const html = fs.readFileSync(htmlPath, "utf-8");
+          res.writeHead(200, { "Content-Type": "text/html" });
+          res.end(html);
+        } catch (err: any) {
+          res.writeHead(500, { "Content-Type": "text/plain" });
+          res.end("Console UI not found: " + htmlPath + " — " + err.message);
+        }
+      },
+    });
+
     // ========================================================================
     // Lifecycle hooks
     // ========================================================================
