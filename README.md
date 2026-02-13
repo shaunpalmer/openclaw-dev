@@ -1,4 +1,4 @@
-![Channel Manager Banner](/ChannelManagerforOpenClaw.png)
+(/ChannelManagerforOpenClaw.png)
 
 # Channel Manager for OpenClaw
 
