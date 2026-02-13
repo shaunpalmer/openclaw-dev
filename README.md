@@ -1,3 +1,5 @@
+![Channel Manager Banner]
+(ChannelManagerforOpenClaw.png)
 # Channel Manager for OpenClaw
 
 > Multi‑channel session orchestration, identity control, and operator-grade tooling for OpenClaw.
