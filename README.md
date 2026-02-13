@@ -1,4 +1,9 @@
-(/ChannelManagerforOpenClaw.png)
+<p align="center">
+  <a href="https://github.com/shaunpalmer/openclaw-dev">
+    <img src="ChannelManagerforOpenClaw.png" alt="Channel Manager for OpenClaw Banner" />
+  </a>
+</p>
+
 
 # Channel Manager for OpenClaw
 
