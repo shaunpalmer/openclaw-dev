@@ -1,8 +1,7 @@
 <p align="center">
-  <a href="https://github.com/shaunpalmer/openclaw-dev">
-    <img src="ChannelManagerforOpenClaw.png" alt="Channel Manager for OpenClaw Banner" />
-  </a>
+  <img src="ChannelManageforOpenClaw.png" alt="Channel Manager for OpenClaw Banner" width="100%" />
 </p>
+
 
 
 # Channel Manager for OpenClaw
